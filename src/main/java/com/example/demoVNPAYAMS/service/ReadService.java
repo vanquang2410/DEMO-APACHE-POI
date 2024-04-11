@@ -1,6 +1,7 @@
 package com.example.demoVNPAYAMS.service;
 
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.util.IOUtils;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +12,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -62,15 +64,18 @@ public class ReadService {
         vietnameseToEnglishDictionary.put("bút toán","transaction_id");
         vietnameseToEnglishDictionary.put("tiền tệ","currency");
         vietnameseToEnglishDictionary.put("tham chiếu","reference");
+
         // Thêm các từ khác nếu cần thiết
     }
 
     public String readFile(String fileName) throws FileNotFoundException {
         try {
+
             FileInputStream file = new FileInputStream(new File(fileName));
             File getFileName = new File(fileName);
+
             String nameFile = getFileName.getName().substring(0, getFileName.getName().lastIndexOf('.'));// Tạo FileInputStream từ tệp Excel
-            XSSFWorkbook workbook = new XSSFWorkbook(file); // Tạo Workbook từ FileInputStream
+            Workbook workbook = new XSSFWorkbook(file); // Tạo Workbook từ FileInputStream
             Sheet sheet = workbook.getSheetAt(0);
             List<String> firstRowData = readFirstRow(sheet);
             List<String>  headerConvertToEngLish = new ArrayList<>();
@@ -78,8 +83,9 @@ public class ReadService {
                 headerConvertToEngLish.add(convertToEnglish(cellData));
             }
             String sqlQuery=createTableSql(nameFile,headerConvertToEngLish);
+            System.out.println(sqlQuery);
             createTableInSql(sqlQuery);
-            int startRow = 2; // Dòng bắt đầu đọc từ dòng thứ 2
+            int startRow = 1; // Dòng bắt đầu đọc từ dòng thứ 2
             List<Object> rowData = readRows(sheet, startRow,headerConvertToEngLish); // Đọc dữ liệu từ dòng thứ 2 trở đi
             String insertDataSql = createInsertSql(nameFile, rowData, headerConvertToEngLish);
             insertValueInTable(insertDataSql);
@@ -91,54 +97,77 @@ public class ReadService {
             return null;
         }
     }
-    private String createInsertSql(String tableName, List<Object> rowData, List<String> headerConvertToEnglish) {
-        StringBuilder sqlQuery = new StringBuilder("INSERT INTO ");
-        sqlQuery.append(tableName).append(" (");
+        private String createInsertSql(String tableName, List<Object> rowData, List<String> headerConvertToEnglish) {
+            StringBuilder sqlQuery = new StringBuilder("INSERT INTO ");
+            sqlQuery.append(tableName).append(" (");
 
-        // Thêm các cột vào câu lệnh INSERT
-        for (String columnName : headerConvertToEnglish) {
-            sqlQuery.append(formatFieldName(columnName)).append(", ");
-        }
-        // Xóa dấu phẩy thừa ở cuối
-        sqlQuery.delete(sqlQuery.length() - 2, sqlQuery.length() - 1);
-
-        sqlQuery.append(") VALUES (");
-
-        // Thêm giá trị của từng ô vào câu lệnh INSERT
-
-        for (Object row : rowData) {
-            List<String> cellDataList = (List<String>) row;
-            for (String cellData : cellDataList) {
-                if (cellData != null) {
-                    // Đối với các giá trị không null, thêm vào câu lệnh INSERT
-                    if (cellData.matches("\\d{2}/\\d{2}/\\d{4}")) {
-                        cellData = convertDate(cellData);
-                    }
-                    else if (cellData.matches("\\d{2}-\\w{3}-\\d{4}")) {
-                        cellData = convertDateTimeStringInMonth(cellData); // Chuyển đổi ngày
-                    }
-                    else if (cellData.matches("\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2} [AP]M")) {
-                        cellData = convertDateTime(cellData); // Chuyển đổi ngày giờ
-                    }
-
-                    sqlQuery.append("'").append(cellData).append("', ");
-                } else {
-                    // Đối với các giá trị null, thêm NULL vào câu lệnh INSERT
-                    sqlQuery.append("NULL, ");
-                }
+            // Thêm các cột vào câu lệnh INSERT
+            for (String columnName : headerConvertToEnglish) {
+                sqlQuery.append(formatFieldName(columnName)).append(", ");
             }
             // Xóa dấu phẩy thừa ở cuối
             sqlQuery.delete(sqlQuery.length() - 2, sqlQuery.length() - 1);
-            sqlQuery.append("), (");
+
+            sqlQuery.append(") VALUES (");
+
+            // Thêm giá trị của từng ô vào câu lệnh INSERT
+
+            for (Object row : rowData) {
+                List<String> cellDataList = (List<String>) row;
+                for (String cellData : cellDataList) {
+                    if (cellData != null) {
+                        // Đối với các giá trị không null, thêm vào câu lệnh INSERT
+                        if (cellData.matches("\\d{2}/\\d{2}/\\d{4}")) {
+                            cellData = convertDate(cellData);
+                        }
+                        else if (cellData.matches("\\d{2}-\\w{3}-\\d{4}")) {
+                            cellData = convertDateTimeStringInMonth(cellData); // Chuyển đổi ngày
+                        } else if (cellData.matches("\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}")) {
+                            cellData=convertDateTimeOut(cellData);
+                        } else if (cellData.matches("\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2} [AP]M")) {
+                            cellData = convertDateTime(cellData); // Chuyển đổi ngày giờ
+                        } else if (cellData.matches("\\d{1,2}/\\d{1,2}/\\d{2} \\d{1,2}:\\d{2} [AP]M")) {
+                            cellData=dateConvertion(cellData);
+                        }
+
+                        sqlQuery.append("'").append(cellData).append("', ");
+                    } else {
+                        // Đối với các giá trị null, thêm NULL vào câu lệnh INSERT
+                        sqlQuery.append("NULL, ");
+                    }
+                }
+                // Xóa dấu phẩy thừa ở cuối
+                sqlQuery.delete(sqlQuery.length() - 2, sqlQuery.length() - 1);
+                sqlQuery.append("), (");
+            }
+            // Xóa dấu phẩy thừa và dấu mở ngoặc ở cuối
+            sqlQuery.delete(sqlQuery.length() - 3, sqlQuery.length());
+
+            sqlQuery.append(";");
+
+            return sqlQuery.toString();
         }
-        // Xóa dấu phẩy thừa và dấu mở ngoặc ở cuối
-        sqlQuery.delete(sqlQuery.length() - 3, sqlQuery.length());
 
-        sqlQuery.append(";");
+        private String dateConvertion(String inputDate){
+            String inputFormat = "M/d/yy hh:mm a";
+            String outputFormat = "yyyy-MM-dd HH:mm:ss";
 
-        return sqlQuery.toString();
-    }
-    private String convertDate(String date) {
+            try {
+                // Parse chuỗi ngày tháng từ định dạng đầu vào
+                SimpleDateFormat inputFormatter = new SimpleDateFormat(inputFormat);
+                Date date = inputFormatter.parse(inputDate);
+
+                // Format lại ngày tháng theo định dạng mong muốn
+                SimpleDateFormat outputFormatter = new SimpleDateFormat(outputFormat);
+                String outputDate = outputFormatter.format(date);
+
+                return outputDate;
+            } catch (ParseException e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+        private String convertDate(String date) {
         try {
             SimpleDateFormat inputFormat = new SimpleDateFormat("dd/MM/yyyy");
             SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -148,7 +177,7 @@ public class ReadService {
             throw new RuntimeException(e);
         }
     }
-    private String convertDateTime(String dateTime) {
+        private String  convertDateTime(String dateTime) {
         try {
             SimpleDateFormat inputFormat = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss a");
             SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -160,7 +189,7 @@ public class ReadService {
         }
     }
 
-    private String convertDateTimeStringInMonth(String date) {
+        private String convertDateTimeStringInMonth(String date) {
         try {
             SimpleDateFormat inputFormat = new SimpleDateFormat("dd-MMM-yyyy", Locale.ENGLISH);
             SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -174,7 +203,7 @@ public class ReadService {
 
 
 
-    private List<Object> readRows(Sheet sheet, int startRow,List<String> headerConvertToEnglish) {
+        private List<Object> readRows(Sheet sheet, int startRow,List<String> headerConvertToEnglish) {
         List<Object> rowData = new ArrayList<>();
 
         Row row;
@@ -210,12 +239,12 @@ public class ReadService {
         }
         return rowData;
     }
-    private static String createTableSql(String nameTable, List<String> fields) {
+        private static String createTableSql(String nameTable, List<String> fields) {
         StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE ").append(nameTable).append(" (");
-        sql.append("\n    id INT AUTO_INCREMENT PRIMARY KEY,");
-
-
+        if(!fields.contains("id")){
+            sql.append("\n    id INT AUTO_INCREMENT PRIMARY KEY,");
+        }
         for (String field : fields) {
             sql.append("\n    ").append(formatFieldName(field)).append(" ").append(guessDataType(field)).append(",");
         }
@@ -226,12 +255,27 @@ public class ReadService {
 
         return sql.toString();
     }
-    private static String formatFieldName(String fieldName) {
+        private String convertDateTimeOut(String dateTimeString) {
+        try {
+            // Parse the input datetime string
+            SimpleDateFormat inputFormat = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss a");
+            Date date = inputFormat.parse(dateTimeString);
+
+            // Format the date in MySQL datetime format
+            SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            return outputFormat.format(date);
+        } catch ( ParseException e) {
+            // Handle parsing exception
+            e.printStackTrace();
+            return null;
+        }
+    }
+        private static String formatFieldName(String fieldName) {
         // Xóa khoảng trắng và thay thế bằng dấu gạch dưới
         return fieldName.toLowerCase().replace(" ", "_");
     }
 
-    private void createTableInSql(String sqlQuery){
+        private void createTableInSql(String sqlQuery){
         if(!sqlQuery.isEmpty()){
             try {
                 jdbcTemplate.execute(sqlQuery);
@@ -243,11 +287,15 @@ public class ReadService {
         }
 
     }
-    private static String guessDataType(String fieldName) {
+        private static String guessDataType(String fieldName) {
         // Dự đoán kiểu dữ liệu dựa trên từ khóa trong tên trường
-        if (fieldName.contains("date")) {
+        if (fieldName.contains("date")||fieldName.contains("time")) {
             return "DATETIME";
-        }  else if(fieldName.contains("reference")){
+        }
+        else if (fieldName.contains("id")) {
+            return "INT  PRIMARY KEY";
+        }
+        else if(fieldName.contains("reference")){
             return "TEXT";
         } else if (fieldName.contains("debit") || fieldName.contains("credit") || fieldName.contains("balance")) {
             return "DOUBLE";
@@ -257,56 +305,61 @@ public class ReadService {
             return "TEXT";
         }
     }
-    private static String convertToEnglish(String vietnameseWord) {
-        // Tạo một StringBuilder để xây dựng chuỗi kết quả
-        StringBuilder result = new StringBuilder();
+        private static String convertToEnglish(String vietnameseWord) {
+            // Tạo một StringBuilder để xây dựng chuỗi kết quả
+            StringBuilder result = new StringBuilder();
 
-        // Chuyển đổi từ tiếng Việt sang chữ thường để so sánh dễ dàng hơn
-        String vietnameseLowercase = vietnameseWord.toLowerCase();
+            // Chuyển đổi từ tiếng Việt sang chữ thường để so sánh dễ dàng hơn
+            String vietnameseLowercase = vietnameseWord.toLowerCase();
 
-        // Biến để lưu trữ các từ ưu tiên cần đưa xuống cuối chuỗi
-        List<String> priorityKeywords = Arrays.asList("number", "type", "date", "status","code");
+            // Biến để lưu trữ các từ ưu tiên cần đưa xuống cuối chuỗi
+            List<String> priorityKeywords = Arrays.asList("number", "type", "date", "status","code");
 
-        // Biến để lưu trữ các từ đã được chuyển đổi
-        List<String> convertedWords = new ArrayList<>();
+            // Biến để lưu trữ các từ đã được chuyển đổi
+            List<String> convertedWords = new ArrayList<>();
+            if(vietnameseWord==""){
+                return "service";
+            }
 
-        // Duyệt qua các từ trong từ điển
-        for (Map.Entry<String, String> entry : vietnameseToEnglishDictionary.entrySet()) {
-            String vietnameseKey = entry.getKey();
-            String englishValue = entry.getValue();
+            // Duyệt qua các từ trong từ điển
+            String vietnameseKey ;
+            String englishValue;
+            for (Map.Entry<String, String> entry : vietnameseToEnglishDictionary.entrySet()) {
+             vietnameseKey = entry.getKey();
+             englishValue = entry.getValue();
 
             // Nếu từ tiếng Việt có trong từ điển, thêm từ tiếng Anh tương ứng vào chuỗi
             if (vietnameseLowercase.contains(vietnameseKey)) {
                 convertedWords.add(englishValue);
-            }
-        }
-
-        // Nếu không có từ tiếng Việt nào trong từ điển, giữ nguyên từ tiếng Việt
-        if (convertedWords.isEmpty()) {
-            result.append(vietnameseWord);
-        } else {
-            // Duyệt qua danh sách các từ đã được chuyển đổi
-            for (String word : convertedWords) {
-                // Nếu từ đó không thuộc danh sách các từ ưu tiên, thêm vào chuỗi kết quả
-                if (!priorityKeywords.contains(word)) {
-                    result.append(word);
-                    result.append(" ");
                 }
             }
 
-            // Duyệt lại danh sách các từ đã được chuyển đổi để thêm các từ ưu tiên vào cuối chuỗi kết quả
-            for (String word : convertedWords) {
-                // Nếu từ đó thuộc danh sách các từ ưu tiên, thêm vào cuối chuỗi kết quả
-                if (priorityKeywords.contains(word)) {
-                    result.append(word);
-                    result.append(" ");
+            // Nếu không có từ tiếng Việt nào trong từ điển, giữ nguyên từ tiếng Việt
+            if (convertedWords.isEmpty()) {
+                result.append(vietnameseWord);
+            } else {
+                // Duyệt qua danh sách các từ đã được chuyển đổi
+                for (String word : convertedWords) {
+                    // Nếu từ đó không thuộc danh sách các từ ưu tiên, thêm vào chuỗi kết quả
+                    if (!priorityKeywords.contains(word)) {
+                        result.append(word);
+                        result.append(" ");
+                    }
                 }
-            }
+
+                // Duyệt lại danh sách các từ đã được chuyển đổi để thêm các từ ưu tiên vào cuối chuỗi kết quả
+                for (String word : convertedWords) {
+                    // Nếu từ đó thuộc danh sách các từ ưu tiên, thêm vào cuối chuỗi kết quả
+                    if (priorityKeywords.contains(word)) {
+                        result.append(word);
+                        result.append(" ");
+                    }
+                }
         }
 
         return result.toString().trim();
     }
-    private static List<String> readFirstRow(Sheet sheet) {
+        private static List<String> readFirstRow(Sheet sheet) {
         List<String> rowData = new ArrayList<>();
         Row firstRow = sheet.getRow(0); // Sử dụng lớp Row từ org.apache.poi.ss.usermodel
         if (firstRow != null) {
@@ -319,7 +372,7 @@ public class ReadService {
         return rowData;
     }
 
-    private void insertValueInTable(String sqlQuery){
+        private void insertValueInTable(String sqlQuery){
         try {
             jdbcTemplate.execute(sqlQuery);
             System.out.println("insert data successfully");
@@ -328,5 +381,6 @@ public class ReadService {
             e.printStackTrace();
         }
     }
+
 
 }

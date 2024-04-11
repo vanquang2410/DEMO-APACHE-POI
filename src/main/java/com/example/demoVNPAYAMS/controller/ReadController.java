@@ -16,7 +16,7 @@ public class ReadController {
 
     @GetMapping("")
     public String readFileExcel() throws FileNotFoundException {
-        String fileName ="C://Users//Admin//Downloads//Telegram Desktop//Vietcombank.xlsx";
+        String fileName ="C://Users//Admin//Downloads//Telegram Desktop//BIDC.xlsx";
         return readService.readFile(fileName);
     }
 }
