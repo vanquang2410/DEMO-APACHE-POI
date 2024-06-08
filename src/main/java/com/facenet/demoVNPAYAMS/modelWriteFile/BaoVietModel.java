@@ -1,14 +1,10 @@
-package com.example.demoVNPAYAMS.modelWriteFile;
+package com.facenet.demoVNPAYAMS.modelWriteFile;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.time.Month;
-import java.util.Date;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Getter
 @Setter

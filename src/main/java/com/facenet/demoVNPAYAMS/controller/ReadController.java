@@ -1,6 +1,6 @@
-package com.example.demoVNPAYAMS.controller;
+package com.facenet.demoVNPAYAMS.controller;
 
-import com.example.demoVNPAYAMS.service.ReadService;
+import com.facenet.demoVNPAYAMS.service.ReadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,8 +15,8 @@ public class ReadController {
     private ReadService readService;
 
     @GetMapping("")
-    public String readFileExcel() throws FileNotFoundException {
-        String fileName ="C://Users//Admin//Downloads//Telegram Desktop//BIDC.xlsx";
+    String readFileExcel() throws FileNotFoundException {
+        String fileName ="C://Users//Admin//Documents//Cấu hình file excel.xlsx";
         return readService.readFile(fileName);
     }
 }

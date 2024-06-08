@@ -1,4 +1,4 @@
-package com.example.demoVNPAYAMS;
+package com.facenet.demoVNPAYAMS;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

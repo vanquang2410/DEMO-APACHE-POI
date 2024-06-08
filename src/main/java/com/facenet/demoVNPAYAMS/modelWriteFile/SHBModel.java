@@ -1,4 +1,4 @@
-    package com.example.demoVNPAYAMS.modelWriteFile;
+    package com.facenet.demoVNPAYAMS.modelWriteFile;
 
     import lombok.Getter;
     import lombok.NoArgsConstructor;
